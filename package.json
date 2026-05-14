@@ -1,0 +1,13 @@
+{
+  "name": "element-shot",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "addfox dev",
+    "build": "addfox build"
+  },
+  "devDependencies": {
+    "addfox": "^0.1.1"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm create *)",
+      "Bash(shopt -s dotglob)",
+      "Bash(mv element-shot/* .)",
+      "Bash(pnpm install *)",
+      "Bash(pnpm addfox *)"
+    ]
+  }
+}
