@@ -22,4 +22,7 @@ const manifest = {
 
 export default defineConfig({
   manifest: { chromium: manifest, firefox: { ...manifest } },
+  browserPath: {
+    chrome: `${process.env.LOCALAPPDATA}\\CentBrowser\\Application\\chrome.exe`,
+  },
 });
