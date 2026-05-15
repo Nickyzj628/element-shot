@@ -5,22 +5,51 @@ console.log("[content] script loaded");
 let isSelecting = false;
 let target = null;
 let toastEl = null;
+let overlayEl = null;
+
+const getOverlay = () => {
+  if (!overlayEl) {
+    overlayEl = document.createElement("div");
+    overlayEl.className = "element-shot-overlay";
+    document.body.appendChild(overlayEl);
+  }
+  return overlayEl;
+};
+
+const removeOverlay = () => {
+  if (overlayEl) {
+    overlayEl.remove();
+    overlayEl = null;
+  }
+};
 
 const highlight = (element) => {
   console.log("[content] highlight element:", element.tagName, element.className);
-  if (target) {
-    target.classList.remove("highlight");
-  }
-
-  element.classList.add("highlight");
   target = element;
+
+  const rect = element.getBoundingClientRect();
+  const overlay = getOverlay();
+  overlay.style.left = `${rect.left}px`;
+  overlay.style.top = `${rect.top}px`;
+  overlay.style.width = `${rect.width}px`;
+  overlay.style.height = `${rect.height}px`;
+};
+
+const resetSelection = () => {
+  removeOverlay();
+  target = null;
+  isSelecting = false;
+  console.log("[content] selection reset");
 };
 
 const shot = (element) => {
   const rect = element.getBoundingClientRect();
-  console.log("[content] shot rect:", {
-    x: rect.left,
-    y: rect.top,
+  // 转换为文档绝对坐标，以支持超出视口的元素截图
+  const docX = rect.left + window.scrollX;
+  const docY = rect.top + window.scrollY;
+  console.log("[content] shot rect (document coords):", {
+    x: docX,
+    y: docY,
     width: rect.width,
     height: rect.height,
   });
@@ -28,8 +57,8 @@ const shot = (element) => {
   chrome.runtime.sendMessage({
     action: "shot",
     data: {
-      x: rect.left,
-      y: rect.top,
+      x: docX,
+      y: docY,
       width: rect.width,
       height: rect.height,
     },
@@ -70,24 +99,27 @@ document.addEventListener("mouseover", (e) => {
 });
 
 document.addEventListener("click", (e) => {
-  if (!target) return;
+  if (!isSelecting || !target) return;
 
   console.log("[content] click target:", target.tagName);
   e.preventDefault();
   e.stopPropagation();
 
-  target.classList.remove("highlight");
-  console.log("[content] highlight removed");
+  removeOverlay();
+  console.log("[content] overlay removed");
 
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => {
-      console.log("[content] double rAF fired, calling shot");
-      shot(target);
-      isSelecting = false;
-      target = null;
-      console.log("[content] selection reset");
-    });
-  });
+  shot(target);
+  resetSelection();
+});
+
+document.addEventListener("keydown", (e) => {
+  if (!isSelecting) return;
+  if (e.key === "Escape") {
+    console.log("[content] ESC pressed, canceling selection");
+    e.preventDefault();
+    e.stopPropagation();
+    resetSelection();
+  }
 });
 
 chrome.runtime.onMessage.addListener((message) => {

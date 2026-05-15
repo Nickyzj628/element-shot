@@ -1,15 +1,9 @@
-.highlight {
-  position: relative;
-}
-
-.highlight::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
+.element-shot-overlay {
+  position: fixed;
+  z-index: 2147483646;
+  pointer-events: none;
   background-color: rgba(0, 0, 255, 0.1);
+  box-sizing: border-box;
 }
 
 .element-shot-toast {

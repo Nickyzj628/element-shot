@@ -6,7 +6,10 @@
       "Bash(mv element-shot/* .)",
       "Bash(pnpm install *)",
       "Bash(pnpm addfox *)",
-      "Bash(pnpm build *)"
+      "Bash(pnpm build *)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebSearch"
     ]
   }
 }

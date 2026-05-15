@@ -7,6 +7,10 @@ settings:
 importers:
 
   .:
+    dependencies:
+      '@zumer/snapdom':
+        specifier: ^2.12.0
+        version: 2.12.0
     devDependencies:
       addfox:
         specifier: ^0.1.1
@@ -550,6 +554,9 @@ packages:
 
   '@vue/shared@3.5.34':
     resolution: {integrity: sha512-24uqU4OIiX29ryC3MeWid/Xf2fa2EFRUVLb77nRhk+UrTVrh/XiGtFAFmJBAtBRbjwNdsPRP+jj/OL27Eg1NDA==}
+
+  '@zumer/snapdom@2.12.0':
+    resolution: {integrity: sha512-TdLGu+1RkKI3JKfMFvn1gRPD/rl8hrAeN6aFjjd0w7S39nulbd94ChxSlfH7nSCm8kzuQkeWFxIsij4+Mk1RDg==}
 
   abort-controller@3.0.0:
     resolution: {integrity: sha512-h8lQ8tacZYnR3vNQTgibj+tODHI5/+l06Au2Pcriv/Gmet0eaj4TwWH41sO9wnHDiQsEj19q0drzdWdeAHtweg==}
@@ -2638,6 +2645,8 @@ snapshots:
       '@vue/shared': 3.5.34
 
   '@vue/shared@3.5.34': {}
+
+  '@zumer/snapdom@2.12.0': {}
 
   abort-controller@3.0.0:
     dependencies:

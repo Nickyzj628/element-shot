@@ -32,6 +32,7 @@ related_files:
 - activeTab
 - scripting
 - clipboardWrite
+- debugger
 - sidePanel
 
 ### 2.2 Host permissions
@@ -54,7 +55,7 @@ content/
 ├── 📁 JS/
 │   └── content/index.js
 └── 📁 CSS/
-    └── static/css/content.20956bd062.css
+    └── static/css/content.b649f80102.css
     ⚙️  html: false
 
 options/
