@@ -5,9 +5,9 @@ node_modules/
 dist/
 .output/
 
-# Addfox skills (can be reinstalled via skills-lock.json)
-.agents/
-.addfox/
+# Addfox temp dirs
+.addfox/cache/
+.addfox/extension/
 
 # OS files
 .DS_Store
