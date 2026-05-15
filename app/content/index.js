@@ -4,6 +4,8 @@ console.log("[content] script loaded");
 
 let isSelecting = false;
 let target = null;
+let hoverOrigin = null;
+let depth = 0;
 let toastEl = null;
 let overlayEl = null;
 
@@ -23,6 +25,14 @@ const removeOverlay = () => {
   }
 };
 
+const getAncestor = (element, levels) => {
+  let el = element;
+  for (let i = 0; i < levels && el; i++) {
+    el = el.parentElement;
+  }
+  return el;
+};
+
 const highlight = (element) => {
   console.log("[content] highlight element:", element.tagName, element.className);
   target = element;
@@ -38,6 +48,8 @@ const highlight = (element) => {
 const resetSelection = () => {
   removeOverlay();
   target = null;
+  hoverOrigin = null;
+  depth = 0;
   isSelecting = false;
   console.log("[content] selection reset");
 };
@@ -94,7 +106,11 @@ document.addEventListener("mouseover", (e) => {
   e.stopPropagation();
 
   const element = e.target;
+  if (element === target) return;
+
   console.log("[content] mouseover:", element.tagName);
+  hoverOrigin = element;
+  depth = 0;
   highlight(element);
 });
 
@@ -121,6 +137,34 @@ document.addEventListener("keydown", (e) => {
     resetSelection();
   }
 });
+
+document.addEventListener("wheel", (e) => {
+  if (!isSelecting || !hoverOrigin) return;
+
+  e.preventDefault();
+  e.stopPropagation();
+
+  if (e.deltaY < 0) {
+    // 向上滚动 → 父元素
+    const nextDepth = depth + 1;
+    const parent = getAncestor(hoverOrigin, nextDepth);
+    if (parent) {
+      depth = nextDepth;
+      console.log("[content] wheel up, depth:", depth, "→", parent.tagName);
+      highlight(parent);
+    }
+  } else if (e.deltaY > 0) {
+    // 向下滚动 → 子元素
+    if (depth > 0) {
+      depth--;
+      const child = getAncestor(hoverOrigin, depth);
+      if (child) {
+        console.log("[content] wheel down, depth:", depth, "→", child.tagName);
+        highlight(child);
+      }
+    }
+  }
+}, { passive: false });
 
 chrome.runtime.onMessage.addListener((message) => {
   const { action, data } = message;
