@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "addfox dev",
-    "build": "addfox build"
+    "build": "addfox build --no-open"
   },
   "devDependencies": {
     "addfox": "^0.1.1"
