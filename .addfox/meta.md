@@ -20,8 +20,8 @@ related_files:
 ## 1. Basic information
 
 - Framework: addfox
-- Name: My Extension
-- Description: Browser extension built with addfox
+- Name: Element Shot
+- Description: 仿Firefox内置截图功能
 - Version: 1.0.0
 - Framework version: 0.1.1
 - Manifest version: 3
@@ -30,10 +30,12 @@ related_files:
 
 ### 2.1 Permissions
 - activeTab
+- scripting
+- clipboardWrite
 - sidePanel
 
 ### 2.2 Host permissions
-- None
+- <all_urls>
 
 ### 2.3 Optional permissions
 - None
@@ -49,28 +51,21 @@ background/
 
 content/
 ├── 📄 Source: C:/Users/Administrator/Documents/element-shot/app/content/index.js
-└── 📁 JS/
-    └── content/index.js
+├── 📁 JS/
+│   └── content/index.js
+└── 📁 CSS/
+    └── static/css/content.20956bd062.css
     ⚙️  html: false
-
-popup/
-├── 📄 Source: C:/Users/Administrator/Documents/element-shot/app/popup/index.js
-└── 📁 JS/
-    ├── popup/index.js
-    └── static/js/shared-vendor.js
-    ⚙️  html: true
 
 options/
 ├── 📄 Source: C:/Users/Administrator/Documents/element-shot/app/options/index.js
 └── 📁 JS/
-    ├── options/index.js
-    └── static/js/shared-vendor.js
+    └── options/index.js
     ⚙️  html: true
 
 sidepanel/
 ├── 📄 Source: C:/Users/Administrator/Documents/element-shot/app/sidepanel/index.js
 └── 📁 JS/
-    ├── sidepanel/index.js
-    └── static/js/shared-vendor.js
+    └── sidepanel/index.js
     ⚙️  html: true
 ```

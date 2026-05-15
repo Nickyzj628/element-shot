@@ -5,7 +5,8 @@
       "Bash(shopt -s dotglob)",
       "Bash(mv element-shot/* .)",
       "Bash(pnpm install *)",
-      "Bash(pnpm addfox *)"
+      "Bash(pnpm addfox *)",
+      "Bash(pnpm build *)"
     ]
   }
 }
