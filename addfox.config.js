@@ -31,7 +31,4 @@ export default defineConfig({
   browserPath: {
     chrome: `${process.env.LOCALAPPDATA}\\CentBrowser\\Application\\chrome.exe`,
   },
-  entry: {
-    popup: "popup-disabled",
-  },
 });

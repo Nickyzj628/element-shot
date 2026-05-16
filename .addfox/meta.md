@@ -33,7 +33,6 @@ related_files:
 - scripting
 - clipboardWrite
 - debugger
-- sidePanel
 
 ### 2.2 Host permissions
 - <all_urls>
@@ -45,28 +44,16 @@ related_files:
 
 ```text
 background/
-├── 📄 Source: C:/Users/Administrator/Documents/element-shot/app/background/index.js
+├── 📄 Source: E:/Projects/element-shot/app/background/index.js
 └── 📁 JS/
     └── background/index.js
     ⚙️  html: false
 
 content/
-├── 📄 Source: C:/Users/Administrator/Documents/element-shot/app/content/index.js
+├── 📄 Source: E:/Projects/element-shot/app/content/index.js
 ├── 📁 JS/
 │   └── content/index.js
 └── 📁 CSS/
-    └── static/css/content.b649f80102.css
+    └── static/css/content.css
     ⚙️  html: false
-
-options/
-├── 📄 Source: C:/Users/Administrator/Documents/element-shot/app/options/index.js
-└── 📁 JS/
-    └── options/index.js
-    ⚙️  html: true
-
-sidepanel/
-├── 📄 Source: C:/Users/Administrator/Documents/element-shot/app/sidepanel/index.js
-└── 📁 JS/
-    └── sidepanel/index.js
-    ⚙️  html: true
 ```

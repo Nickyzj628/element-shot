@@ -10,7 +10,7 @@
   position: fixed;
   top: 16px;
   left: 50%;
-  transform: translateX(-50%);
+  transform: translateX(-50%) translateY(-4px);
   padding: 10px 20px;
   border-radius: 8px;
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -19,12 +19,16 @@
   z-index: 2147483647;
   pointer-events: none;
   opacity: 0;
-  transition: opacity 0.3s ease;
+  transition-property: opacity, transform;
+  transition-duration: 0.3s;
+  transition-timing-function: ease;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  -webkit-font-smoothing: antialiased;
 }
 
 .element-shot-toast.show {
   opacity: 1;
+  transform: translateX(-50%) translateY(0);
 }
 
 .element-shot-toast.success {
