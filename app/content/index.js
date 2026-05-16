@@ -1,7 +1,5 @@
 import "./styles.css";
 
-console.log("[content] script loaded");
-
 let isSelecting = false;
 let target = null;
 let hoverOrigin = null;
@@ -34,7 +32,6 @@ const getAncestor = (element, levels) => {
 };
 
 const highlight = (element) => {
-  console.log("[content] highlight element:", element.tagName, element.className);
   target = element;
 
   const rect = element.getBoundingClientRect();
@@ -51,7 +48,6 @@ const resetSelection = () => {
   hoverOrigin = null;
   depth = 0;
   isSelecting = false;
-  console.log("[content] selection reset");
 };
 
 const shot = (element) => {
@@ -59,13 +55,6 @@ const shot = (element) => {
   // 转换为文档绝对坐标，以支持超出视口的元素截图
   const docX = rect.left + window.scrollX;
   const docY = rect.top + window.scrollY;
-  console.log("[content] shot rect (document coords):", {
-    x: docX,
-    y: docY,
-    width: rect.width,
-    height: rect.height,
-  });
-  console.log("[content] sending shot message...");
   chrome.runtime.sendMessage({
     action: "shot",
     data: {
@@ -78,7 +67,6 @@ const shot = (element) => {
 };
 
 const showToast = (message, type) => {
-  console.log("[content] showToast:", type, message);
   if (!toastEl) {
     toastEl = document.createElement("div");
     toastEl.className = "element-shot-toast";
@@ -102,13 +90,11 @@ const showToast = (message, type) => {
 document.addEventListener("mouseover", (e) => {
   if (!isSelecting) return;
 
-  e.preventDefault();
   e.stopPropagation();
 
   const element = e.target;
   if (element === target) return;
 
-  console.log("[content] mouseover:", element.tagName);
   hoverOrigin = element;
   depth = 0;
   highlight(element);
@@ -117,13 +103,10 @@ document.addEventListener("mouseover", (e) => {
 document.addEventListener("click", (e) => {
   if (!isSelecting || !target) return;
 
-  console.log("[content] click target:", target.tagName);
   e.preventDefault();
   e.stopPropagation();
 
   removeOverlay();
-  console.log("[content] overlay removed");
-
   shot(target);
   resetSelection();
 });
@@ -131,7 +114,6 @@ document.addEventListener("click", (e) => {
 document.addEventListener("keydown", (e) => {
   if (!isSelecting) return;
   if (e.key === "Escape") {
-    console.log("[content] ESC pressed, canceling selection");
     e.preventDefault();
     e.stopPropagation();
     resetSelection();
@@ -150,7 +132,6 @@ document.addEventListener("wheel", (e) => {
     const parent = getAncestor(hoverOrigin, nextDepth);
     if (parent) {
       depth = nextDepth;
-      console.log("[content] wheel up, depth:", depth, "→", parent.tagName);
       highlight(parent);
     }
   } else if (e.deltaY > 0) {
@@ -159,7 +140,6 @@ document.addEventListener("wheel", (e) => {
       depth--;
       const child = getAncestor(hoverOrigin, depth);
       if (child) {
-        console.log("[content] wheel down, depth:", depth, "→", child.tagName);
         highlight(child);
       }
     }
@@ -168,12 +148,10 @@ document.addEventListener("wheel", (e) => {
 
 chrome.runtime.onMessage.addListener((message) => {
   const { action, data } = message;
-  console.log("[content] onMessage received:", action, data);
 
   switch (action) {
     case "select": {
       isSelecting = true;
-      console.log("[content] selecting mode ON");
       break;
     }
     case "success": {
@@ -182,10 +160,6 @@ chrome.runtime.onMessage.addListener((message) => {
     }
     case "error": {
       showToast(data, "error");
-      break;
-    }
-    default: {
-      console.log("[content] unhandled message data:", data);
       break;
     }
   }
