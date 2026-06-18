@@ -5,6 +5,7 @@ let target = null;
 let hoverOrigin = null;
 let depth = 0;
 let toastEl = null;
+let toastTimer = null;
 let overlayEl = null;
 
 const getOverlay = () => {
@@ -80,10 +81,14 @@ const showToast = (message, type) => {
     toastEl.classList.add("show");
   });
 
-  setTimeout(() => {
+  if (toastTimer !== null) {
+    clearTimeout(toastTimer);
+  }
+  toastTimer = setTimeout(() => {
     if (toastEl) {
       toastEl.classList.remove("show");
     }
+    toastTimer = null;
   }, 3000);
 };
 
