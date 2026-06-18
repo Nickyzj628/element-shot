@@ -1,8 +1,9 @@
+import { existsSync } from "node:fs";
 import { defineConfig } from "addfox";
 
 const manifest = {
   name: "Element Shot",
-  version: "1.0.0",
+  version: "1.0.1",
   manifest_version: 3,
   description: "仿Firefox内置截图功能",
   permissions: ["activeTab", "scripting", "clipboardWrite", "debugger"],
@@ -26,9 +27,11 @@ const manifest = {
   ],
 };
 
+const browserPath = process.env.LOCALAPPDATA
+  ? { chrome: `${process.env.LOCALAPPDATA}\\CentBrowser\\Application\\chrome.exe` }
+  : undefined;
+
 export default defineConfig({
   manifest: { chromium: manifest, firefox: { ...manifest } },
-  browserPath: {
-    chrome: `${process.env.LOCALAPPDATA}\\CentBrowser\\Application\\chrome.exe`,
-  },
+  ...(browserPath && existsSync(browserPath.chrome) && { browserPath }),
 });
