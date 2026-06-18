@@ -9,15 +9,15 @@ const manifest = {
   permissions: ["activeTab", "scripting", "clipboardWrite", "debugger"],
   host_permissions: ["<all_urls>"],
   icons: {
-    "16": "icons/icon_128.png",
-    "48": "icons/icon_128.png",
-    "128": "icons/icon_128.png",
+    16: "icons/icon_128.png",
+    48: "icons/icon_128.png",
+    128: "icons/icon_128.png",
   },
   action: {
     default_icon: {
-      "16": "icons/icon_128.png",
-      "48": "icons/icon_128.png",
-      "128": "icons/icon_128.png",
+      16: "icons/icon_128.png",
+      48: "icons/icon_128.png",
+      128: "icons/icon_128.png",
     },
   },
   content_scripts: [

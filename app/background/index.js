@@ -1,6 +1,7 @@
 const capturingTabs = new Set();
 
 chrome.action.onClicked.addListener((tab) => {
+  if (tab.id == null) return;
   chrome.tabs.sendMessage(tab.id, { action: "select" }, () => {
     void chrome.runtime.lastError;
   });
@@ -10,8 +11,8 @@ chrome.runtime.onMessage.addListener((message, sender) => {
   const { action, data } = message;
   if (action !== "shot") return;
 
-  const tabId = sender.tab.id;
-  if (capturingTabs.has(tabId)) return;
+  const tabId = sender.tab?.id;
+  if (tabId == null || capturingTabs.has(tabId)) return;
   capturingTabs.add(tabId);
 
   const sendMessage = (action, data) => {
@@ -28,7 +29,8 @@ chrome.runtime.onMessage.addListener((message, sender) => {
       await navigator.clipboard.write([clipboardItem]);
       return { ok: true, message: "写入剪贴板成功！" };
     } catch (err) {
-      return { ok: false, message: "写入剪贴板失败：" + err.message };
+      const msg = err instanceof Error ? err.message : String(err);
+      return { ok: false, message: `写入剪贴板失败：${msg}` };
     }
   };
 
@@ -48,6 +50,7 @@ chrome.runtime.onMessage.addListener((message, sender) => {
       const [injectionResult] = await chrome.scripting.executeScript({
         target: { tabId },
         func: writeBase64ToClipboard,
+        // @ts-expect-error sendCommand 返回类型根据命令不同而变化，@types/chrome 声明为通用 object
         args: [result.data],
       });
 
@@ -58,13 +61,14 @@ chrome.runtime.onMessage.addListener((message, sender) => {
         sendMessage("error", res?.message || "未知错误");
       }
     } catch (err) {
-      console.error("[background] capture error:", err.message);
-      sendMessage("error", "截图失败：" + err.message);
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("[background] capture error:", msg);
+      sendMessage("error", `截图失败：${msg}`);
     } finally {
       capturingTabs.delete(tabId);
       try {
         await chrome.debugger.detach({ tabId });
-      } catch (e) {
+      } catch (_e) {
         // 可能已经是 detached 状态，忽略错误
       }
     }

@@ -5,9 +5,16 @@
   "type": "module",
   "scripts": {
     "dev": "addfox dev",
-    "build": "addfox build --no-open"
+    "build": "addfox build --no-open",
+    "lint": "biome check .",
+    "format": "biome check --write .",
+    "format:check": "biome format .",
+    "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
-    "addfox": "^0.1.1"
+    "@biomejs/biome": "^2.5.0",
+    "@types/chrome": "^0.1.43",
+    "addfox": "^0.1.1",
+    "typescript": "^6.0.3"
   }
 }
