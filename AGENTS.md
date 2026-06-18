@@ -115,3 +115,16 @@ app/
 
 - [Addfox 官方文档](https://addfox.dev)
 - [WebExtension API 文档](https://developer.mozilla.org/zh-CN/docs/Mozilla/Add-ons/WebExtensions/API)
+
+## 代码质量
+
+项目使用 [Biome](https://biomejs.dev) 进行 lint 与格式化，使用 TypeScript（`checkJs` 模式，仅做类型检查不输出）。运行：
+
+```bash
+pnpm lint            # Biome lint
+pnpm format:check    # Biome 格式校验
+pnpm format          # Biome 自动修复
+pnpm typecheck       # tsc --noEmit
+```
+
+源码保持纯 JavaScript，通过 JSDoc + `checkJs` 提供类型提示，无需 .ts 重构。

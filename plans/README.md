@@ -1,8 +1,8 @@
 # 实施计划 — element-shot
 
-由 `improve` 技能于 2026-06-17 基于提交 `d7d3025`（HEAD）生成。工作区中 `addfox.config.js`、`app/background/index.js` 和 `CLAUDE.md` 有尚未提交的本地修改，这些已在上文"当前状态"中体现。
+由 `improve` 技能于 2026-06-17 基于提交 `d7d3025`（HEAD）生成。全部原始发现已通过 plan 001–006 处理完毕。
 
-本仓库是一个微型 Chrome MV3 扩展（源码约 280 行：`app/background/index.js` 74 行，`app/content/index.js` 166 行，CSS 40 行），功能是将元素截图保存到剪贴板。它使用 Addfox 0.1.1 框架（基于 Rsbuild），原生 ES Module，无 TypeScript，无测试运行器，无 lint 配置。Git 历史（自 2025-05-16 起的 16 次提交）显示这是一个正在持续打磨的小型项目。
+本仓库是一个微型 Chrome MV3 扩展（源码约 280 行：`app/background/index.js` 74 行，`app/content/index.js` + `app/content/select.js` 约 170 行，CSS 40 行），功能是将元素截图保存到剪贴板。它使用 Addfox 0.1.1 框架（基于 Rsbuild），原生 ES Module，无 TypeScript，无测试运行器，使用 Biome 进行 lint 和格式化，TypeScript checkJs 做类型检查。Git 历史（自 2025-05-16 起的 16 次提交）显示这是一个正在持续打磨的小型项目。
 
 开始前请完整阅读每个计划；遵守其"停止条件"；完成后更新对应的状态行。
 
@@ -13,7 +13,7 @@
 | 001  | 修复吐司计时器竞态条件 | P1 | S | — | DONE |
 | 002  | 停止滚轮处理器在水平手势上阻止页面滚动 | P1 | S | — | DONE |
 | 003  | 仅在选择模式下挂载内容脚本事件监听器 | P2 | M | 001, 002 | DONE |
-| 004  | 建立单元测试基线（Rstest + chrome API 模拟） | P2 | M | — | TODO |
+| 004  | 建立单元测试基线（Rstest + chrome API 模拟） | P2 | M | — | SKIPPED（用户跳过） |
 | 005  | 在 package.json 中添加 lint 和 typecheck 脚本 | P3 | S | — | DONE |
 | 006  | 修复 addfox dev 启动配置 | P2 | S | 001 | DONE |
 
