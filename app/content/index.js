@@ -128,10 +128,10 @@ document.addEventListener("keydown", (e) => {
 document.addEventListener("wheel", (e) => {
   if (!isSelecting || !hoverOrigin) return;
 
-  e.preventDefault();
   e.stopPropagation();
 
   if (e.deltaY < 0) {
+    e.preventDefault();
     // 向上滚动 → 父元素
     const nextDepth = depth + 1;
     const parent = getAncestor(hoverOrigin, nextDepth);
@@ -140,6 +140,7 @@ document.addEventListener("wheel", (e) => {
       highlight(parent);
     }
   } else if (e.deltaY > 0) {
+    e.preventDefault();
     // 向下滚动 → 子元素
     if (depth > 0) {
       depth--;
@@ -149,6 +150,7 @@ document.addEventListener("wheel", (e) => {
       }
     }
   }
+  // deltaY === 0：纯水平 / 缩放 / 惯性 — 让页面自行处理。
 }, { passive: false });
 
 chrome.runtime.onMessage.addListener((message) => {

@@ -54,6 +54,6 @@ content/
 ├── 📁 JS/
 │   └── content/index.js
 └── 📁 CSS/
-    └── static/css/content.bd20ebe820.css
+    └── static/css/content.css
     ⚙️  html: false
 ```
