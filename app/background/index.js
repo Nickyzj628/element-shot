@@ -1,7 +1,9 @@
 const capturingTabs = new Set();
 
 chrome.action.onClicked.addListener((tab) => {
-  chrome.tabs.sendMessage(tab.id, { action: "select" });
+  chrome.tabs.sendMessage(tab.id, { action: "select" }, () => {
+    void chrome.runtime.lastError;
+  });
 });
 
 chrome.runtime.onMessage.addListener((message, sender) => {
@@ -13,7 +15,9 @@ chrome.runtime.onMessage.addListener((message, sender) => {
   capturingTabs.add(tabId);
 
   const sendMessage = (action, data) => {
-    chrome.tabs.sendMessage(tabId, { action, data });
+    chrome.tabs.sendMessage(tabId, { action, data }, () => {
+      void chrome.runtime.lastError;
+    });
   };
 
   const writeBase64ToClipboard = async (base64Data) => {
