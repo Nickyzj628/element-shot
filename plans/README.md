@@ -18,6 +18,8 @@
 | 006  | 修复 addfox dev 启动配置 | P2 | S | 001 | DONE |
 | 007  | 在选择模式下阻止点击元素触发页面跳转 | P1 | S | — | DONE |
 | 008  | 将元素坐标测量推迟到 debugger 横幅出现之后 | P1 | M | — | DONE |
+| 009  | 点击后锁定 target，防止 debugger 横幅导致的布局偏移覆盖选中元素 | P1 | S | 008 | DONE |
+| 010  | 修复 debugger 附加后截图 x 轴偏移（fromSurface + 双 rAF） | P1 | S | 008, 009 | DONE |
 
 状态值：TODO | IN PROGRESS | DONE | BLOCKED（附一行原因） | REJECTED（附一行理由）。
 
@@ -29,6 +31,8 @@
 - 006 是 001 验收时衍生出的 dev 配置问题（firefox 拆分导致构建失败 + `browserPath` 字段类型错误导致 dev 启动失败），分两次提交（001 修复 + 006 配置修复），保持 001 自身纯净。
 - 007 独立于所有现有计划，可直接执行。
 - 008 独立执行；虽然涉及与 007 相同的 `onClick` 代码行，但修改逻辑正交（007 改事件阶段，008 改消息时序），不冲突。
+- 009 依赖 008 的 deferred measurement 架构；在其基础上修补 `target` 被意外覆盖的遗漏。仅涉及 `select.js`，1 个文件约 10 行改动。
+- 010 修复 debugger 附加后因滚动条隐藏导致的 x 轴偏移。两处改动：content/index.js（单 rAF → 双 rAF）和 background/index.js（fromSurface: true → false）。
 
 ## 已审议但拒绝的发现
 

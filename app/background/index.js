@@ -40,7 +40,7 @@ chrome.runtime.onMessage.addListener((message, sender) => {
       await chrome.debugger.sendCommand({ tabId }, "Page.enable");
 
       // 等待一帧让 debugger 横幅渲染、页面完成重新布局
-      await new Promise((r) => setTimeout(r, 100));
+      await new Promise((r) => setTimeout(r, 150));
 
       // 向 content script 请求横幅出现后的元素坐标
       const rectData = await chrome.tabs.sendMessage(tabId, { action: "getRect" });

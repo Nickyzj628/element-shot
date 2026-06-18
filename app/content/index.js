@@ -3,6 +3,7 @@ import { createSelection } from "./select.js";
 
 let toastEl = null;
 let toastTimer = null;
+let origScrollbarGutter = "";
 
 const showToast = (message, type) => {
   if (!toastEl) {
@@ -44,16 +45,25 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     case "error":
       showToast(data, "error");
       break;
-    case "getRect":
-      // 等待一帧（requestAnimationFrame），确保 debugger 横幅已渲染、
-      // 页面已完成重新布局，再测量元素位置。
+    case "getRect": {
+      // 注入 scrollbar-gutter: stable，强制浏览器始终为滚动条保留空间。
+      // 这样 Page.captureScreenshot 隐藏滚动条时，页面内容不会膨胀移位，
+      // getBoundingClientRect 测量到的 x 坐标与截图时的实际布局一致。
+      origScrollbarGutter = document.documentElement.style.scrollbarGutter;
+      document.documentElement.style.scrollbarGutter = "stable";
+      // 双 rAF：确保 scrollbar-gutter 生效 + debugger 横幅渲染等异步布局变更完成。
       requestAnimationFrame(() => {
-        const rect = selection.getRect();
-        sendResponse(rect);
-        selection.teardown();
+        requestAnimationFrame(() => {
+          const rect = selection.getRect();
+          sendResponse(rect);
+          selection.teardown();
+        });
       });
       return true; // 保持消息通道开启以支持异步 sendResponse
+    }
     case "teardown":
+      // background 在截图完成后发送此消息，此时恢复 scrollbar-gutter。
+      document.documentElement.style.scrollbarGutter = origScrollbarGutter;
       selection.teardown();
       break;
   }

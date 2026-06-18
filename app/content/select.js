@@ -7,6 +7,7 @@ const createSelection = () => {
   let hoverOrigin = null;
   let depth = 0;
   let overlayEl = null;
+  let locked = false;
 
   const getAncestor = (element, levels) => {
     let el = element;
@@ -43,6 +44,7 @@ const createSelection = () => {
   };
 
   const onMouseOver = (e) => {
+    if (locked) return;
     e.stopPropagation();
     const element = e.target;
     if (element === target) return;
@@ -56,6 +58,9 @@ const createSelection = () => {
     e.preventDefault();
     e.stopImmediatePropagation();
     removeOverlay();
+    // 锁定 target，防止后续 mouseover / wheel 事件（如 debugger 横幅
+    // 导致的布局偏移触发意外 mouseover）覆盖掉用户点击时选中的元素。
+    locked = true;
     // 仅发送触发信号，坐标由 background 稍后通过 getRect 消息主动获取。
     // 这样可以在 debugger 横幅出现、页面重新布局之后再测量元素位置。
     chrome.runtime.sendMessage({ action: "shot" });
@@ -81,6 +86,7 @@ const createSelection = () => {
   };
 
   const onWheel = (e) => {
+    if (locked) return;
     if (!hoverOrigin) return;
 
     e.stopPropagation();
@@ -117,6 +123,7 @@ const createSelection = () => {
     target = null;
     hoverOrigin = null;
     depth = 0;
+    locked = false;
   };
 
   const setup = () => {
