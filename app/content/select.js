@@ -54,7 +54,7 @@ const createSelection = () => {
   const onClick = (e) => {
     if (!target) return;
     e.preventDefault();
-    e.stopPropagation();
+    e.stopImmediatePropagation();
     removeOverlay();
     const rect = target.getBoundingClientRect();
     // 转换为文档绝对坐标，以支持超出视口的元素截图
@@ -108,7 +108,7 @@ const createSelection = () => {
 
   const teardown = () => {
     document.removeEventListener("mouseover", onMouseOver);
-    document.removeEventListener("click", onClick);
+    document.removeEventListener("click", onClick, true);
     document.removeEventListener("keydown", onKeyDown);
     document.removeEventListener("wheel", onWheel);
     removeOverlay();
@@ -119,7 +119,7 @@ const createSelection = () => {
 
   const setup = () => {
     document.addEventListener("mouseover", onMouseOver);
-    document.addEventListener("click", onClick);
+    document.addEventListener("click", onClick, true);
     document.addEventListener("keydown", onKeyDown);
     document.addEventListener("wheel", onWheel, { passive: false });
   };
