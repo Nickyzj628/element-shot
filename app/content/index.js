@@ -31,7 +31,7 @@ const showToast = (message, type) => {
 
 const selection = createSelection();
 
-chrome.runtime.onMessage.addListener((message) => {
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   const { action, data } = message;
 
   switch (action) {
@@ -43,6 +43,18 @@ chrome.runtime.onMessage.addListener((message) => {
       break;
     case "error":
       showToast(data, "error");
+      break;
+    case "getRect":
+      // 等待一帧（requestAnimationFrame），确保 debugger 横幅已渲染、
+      // 页面已完成重新布局，再测量元素位置。
+      requestAnimationFrame(() => {
+        const rect = selection.getRect();
+        sendResponse(rect);
+        selection.teardown();
+      });
+      return true; // 保持消息通道开启以支持异步 sendResponse
+    case "teardown":
+      selection.teardown();
       break;
   }
 });

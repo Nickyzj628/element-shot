@@ -56,18 +56,20 @@ const createSelection = () => {
     e.preventDefault();
     e.stopImmediatePropagation();
     removeOverlay();
+    // 仅发送触发信号，坐标由 background 稍后通过 getRect 消息主动获取。
+    // 这样可以在 debugger 横幅出现、页面重新布局之后再测量元素位置。
+    chrome.runtime.sendMessage({ action: "shot" });
+  };
+
+  const getRect = () => {
+    if (!target) return null;
     const rect = target.getBoundingClientRect();
-    // 转换为文档绝对坐标，以支持超出视口的元素截图
-    chrome.runtime.sendMessage({
-      action: "shot",
-      data: {
-        x: rect.left + window.scrollX,
-        y: rect.top + window.scrollY,
-        width: rect.width,
-        height: rect.height,
-      },
-    });
-    teardown();
+    return {
+      x: rect.left + window.scrollX,
+      y: rect.top + window.scrollY,
+      width: rect.width,
+      height: rect.height,
+    };
   };
 
   const onKeyDown = (e) => {
@@ -124,7 +126,7 @@ const createSelection = () => {
     document.addEventListener("wheel", onWheel, { passive: false });
   };
 
-  return { setup, teardown };
+  return { setup, teardown, getRect };
 };
 
 export { createSelection };

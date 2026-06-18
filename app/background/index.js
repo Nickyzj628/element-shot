@@ -8,7 +8,7 @@ chrome.action.onClicked.addListener((tab) => {
 });
 
 chrome.runtime.onMessage.addListener((message, sender) => {
-  const { action, data } = message;
+  const { action } = message;
   if (action !== "shot") return;
 
   const tabId = sender.tab?.id;
@@ -39,7 +39,17 @@ chrome.runtime.onMessage.addListener((message, sender) => {
       await chrome.debugger.attach({ tabId }, "1.3");
       await chrome.debugger.sendCommand({ tabId }, "Page.enable");
 
-      const { x, y, width, height } = data;
+      // 等待一帧让 debugger 横幅渲染、页面完成重新布局
+      await new Promise((r) => setTimeout(r, 100));
+
+      // 向 content script 请求横幅出现后的元素坐标
+      const rectData = await chrome.tabs.sendMessage(tabId, { action: "getRect" });
+      if (!rectData) {
+        sendMessage("error", "截图取消或目标元素已失效");
+        return;
+      }
+
+      const { x, y, width, height } = rectData;
       const result = await chrome.debugger.sendCommand({ tabId }, "Page.captureScreenshot", {
         format: "png",
         clip: { x, y, width, height, scale: 1 },
@@ -66,6 +76,10 @@ chrome.runtime.onMessage.addListener((message, sender) => {
       sendMessage("error", `截图失败：${msg}`);
     } finally {
       capturingTabs.delete(tabId);
+      // 通知 content script 清理选择状态（无论成功或失败）
+      chrome.tabs.sendMessage(tabId, { action: "teardown" }, () => {
+        void chrome.runtime.lastError;
+      });
       try {
         await chrome.debugger.detach({ tabId });
       } catch (_e) {
