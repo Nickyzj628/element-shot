@@ -8,6 +8,7 @@ const createSelection = () => {
   let depth = 0;
   let overlayEl = null;
   let locked = false;
+  let armed = false;
 
   const getAncestor = (element, levels) => {
     let el = element;
@@ -53,17 +54,39 @@ const createSelection = () => {
     highlight(element);
   };
 
-  const onClick = (e) => {
+  const onMouseDown = (e) => {
     if (!target) return;
+    if (e.button !== 0) return; // 仅响应左键
     e.preventDefault();
     e.stopImmediatePropagation();
-    removeOverlay();
     // 锁定 target，防止后续 mouseover / wheel 事件（如 debugger 横幅
-    // 导致的布局偏移触发意外 mouseover）覆盖掉用户点击时选中的元素。
+    // 导致的布局偏移触发意外 mouseover）覆盖掉用户按下的元素。
     locked = true;
-    // 仅发送触发信号，坐标由 background 稍后通过 getRect 消息主动获取。
-    // 这样可以在 debugger 横幅出现、页面重新布局之后再测量元素位置。
+    // mousedown 时即启动 chrome.debugger，让"正在调试此浏览器"横幅
+    // 在用户按住期间渲染完毕，避免抬起后再等待导致明显延迟。
+    // 注意：此处不移除高亮 overlay，让用户在按住期间仍能看到选中元素
+    // 的高亮效果，直到 mouseup 才移除并截图。
+    armed = true;
+    chrome.runtime.sendMessage({ action: "attach" });
+  };
+
+  const onMouseUp = (e) => {
+    if (!armed) return;
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    armed = false;
+    // 抬起时移除高亮并触发截图。
+    removeOverlay();
+    // debugger 横幅此时已渲染完成，直接触发截图。
     chrome.runtime.sendMessage({ action: "shot" });
+  };
+
+  // click 事件在 mouseup 之后触发，此处仅吞掉残余事件、阻止冒泡到页面元素，
+  // 不再启动截图（截图已在 mouseup 中触发）。
+  const onClick = (e) => {
+    e.preventDefault();
+    e.stopImmediatePropagation();
   };
 
   const getRect = () => {
@@ -81,7 +104,14 @@ const createSelection = () => {
     if (e.key === "Escape") {
       e.preventDefault();
       e.stopPropagation();
-      teardown();
+      // mousedown 后的 armed 状态由 background 的 cancel 消息负责清理，
+      // 这里仅在尚未 arm 时直接 teardown 选择层。
+      if (armed) {
+        armed = false;
+        chrome.runtime.sendMessage({ action: "cancel" });
+      } else {
+        teardown();
+      }
     }
   };
 
@@ -116,6 +146,8 @@ const createSelection = () => {
 
   const teardown = () => {
     document.removeEventListener("mouseover", onMouseOver);
+    document.removeEventListener("mousedown", onMouseDown, true);
+    document.removeEventListener("mouseup", onMouseUp, true);
     document.removeEventListener("click", onClick, true);
     document.removeEventListener("keydown", onKeyDown);
     document.removeEventListener("wheel", onWheel);
@@ -124,10 +156,13 @@ const createSelection = () => {
     hoverOrigin = null;
     depth = 0;
     locked = false;
+    armed = false;
   };
 
   const setup = () => {
     document.addEventListener("mouseover", onMouseOver);
+    document.addEventListener("mousedown", onMouseDown, true);
+    document.addEventListener("mouseup", onMouseUp, true);
     document.addEventListener("click", onClick, true);
     document.addEventListener("keydown", onKeyDown);
     document.addEventListener("wheel", onWheel, { passive: false });

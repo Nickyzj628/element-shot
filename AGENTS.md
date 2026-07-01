@@ -66,17 +66,18 @@ app/
 
 ### 通信流程
 
-整个截图流程涉及三次跨上下文通信，阅读代码时需注意消息发送者和接收者：
+整个截图流程涉及多次跨上下文通信，阅读代码时需注意消息发送者和接收者：
 
 1. **background → content**：用户点击扩展图标时，`chrome.action.onClicked` 触发，向当前标签页发送 `{ action: "select" }`，启动元素选择模式。
-2. **content → background**：用户点击目标元素后，content script 计算元素的 `getBoundingClientRect()`，将坐标转换为文档绝对坐标（加上 `window.scrollX/scrollY` 以支持超出视口的元素），发送 `{ action: "shot", data: { x, y, width, height } }`。
-3. **background → content**：background 通过 `chrome.debugger.attach` + `Page.captureScreenshot`（启用 `captureBeyondViewport` 支持超视口区域）直接截取目标区域，得到 base64 PNG。然后调用 `chrome.scripting.executeScript` 向页面注入 `writeBase64ToClipboard` 函数执行剪贴板写入。注入函数返回执行结果，background 根据结果通过 `chrome.tabs.sendMessage` 向 content script 发送 `{ action: "success" }` 或 `{ action: "error" }` 消息。处理完成后无论成败都会 `chrome.debugger.detach` 释放调试会话。
+2. **content → background（`attach`）**：用户在目标元素上**按下**鼠标左键（`mousedown`）时，content script 锁定选中元素并发送 `{ action: "attach" }`。background 随即 `chrome.debugger.attach` + `Page.enable`，让"正在调试此浏览器"黄色横幅在用户按住期间渲染完毕、页面完成重新布局。
+3. **content → background（`shot`）**：用户**抬起**鼠标左键（`mouseup`）时，content script 发送 `{ action: "shot" }`。background 通过 `chrome.tabs.sendMessage` 向 content 请求 `{ action: "getRect" }`，content 在横幅出现后重新测量 `getBoundingClientRect()`（坐标加上 `window.scrollX/scrollY` 以支持超出视口的元素）并返回。background 据此调用 `Page.captureScreenshot`（启用 `captureBeyondViewport` 支持超视口区域）截取目标区域得到 base64 PNG，再通过 `chrome.scripting.executeScript` 向页面注入 `writeBase64ToClipboard` 执行剪贴板写入，并根据结果回送 `{ action: "success" }` 或 `{ action: "error" }`。处理完成后无论成败都会 `chrome.debugger.detach` 释放调试会话。
+4. **content → background（`cancel`，可选）**：若用户在按下后、抬起前按 `Esc`，content 发送 `{ action: "cancel" }`，background 直接 `detach` 并通知 content 清理选择状态，不进行截图。
 
 ### 关键实现细节
 
 - **使用 chrome.debugger 截图**：选择 `chrome.debugger` API 而非 `chrome.tabs.captureVisibleTab`，是因为后者只能截取当前视口，无法支持超出视口范围的元素。`debugger` 每次使用会弹出"正在调试此浏览器"黄色横幅，是当前方案的已知代价。
-- **并发控制**：background 维护 `capturingTabs: Set<tabId>` 防止同一标签页的并发截图请求叠加；同一 tab 的后续请求在 `finally` 中通过 `capturingTabs.delete(tabId)` 解锁。
-- **元素选择交互**：content 脚本通过 `mouseover` 实时高亮、点击触发截图、`wheel` 在祖先层级之间切换（向上滚=父元素、向下滚=回到子一级）、`Esc` 退出选择模式。
+- **按下即 attach、抬起才截图**：将 `chrome.debugger.attach` 提前到 `mousedown`，使横幅在用户按住期间就渲染并完成布局，`mouseup` 时无需再等待即可截图，消除抬起后到截图之间的明显延迟。background 用 `armedTabs: Set<tabId>` 记录已 attach 但尚未截图的标签页，`capturingTabs: Set<tabId>` 记录正在截图的标签页，二者共同防止并发请求叠加。
+- **元素选择交互**：content 脚本通过 `mouseover` 实时高亮、`mousedown` 启动 debugger、`mouseup` 触发截图、`wheel` 在祖先层级之间切换（向上滚=父元素、向下滚=回到子一级）、`Esc` 退出选择模式（按下阶段则取消截图）。
 - **剪贴板写入方式**：由于 Manifest V3 的 Service Worker 无法直接访问 `navigator.clipboard.write`，background.js 将 base64 数据传入页面上下文，在页面中执行 `ClipboardItem` 写入操作。
 - **错误/成功提示**：content.js 收到 `success` / `error` 消息后会在页面顶部显示 toast 浮层提示，3 秒后自动消失。
 
@@ -128,3 +129,13 @@ pnpm typecheck       # tsc --noEmit
 ```
 
 源码保持纯 JavaScript，通过 JSDoc + `checkJs` 提供类型提示，无需 .ts 重构。
+
+## Git 提交约定
+
+- 提交信息使用 Conventional Commits 前缀（`feat` / `fix` / `chore` / `docs` / `refactor`，可带 scope），正文用简体中文，分小节说明改动与动机。
+- **AI 提交时必须添加 co-authored-by 尾注**：由 AI 生成并执行的提交，commit message 末尾需附 `Co-Authored-By: Reasonix <noreply@reasonix.ai>`，以标注该提交由 AI 协作完成。
+
+## Git 提交约定
+
+- 提交信息使用 Conventional Commits 前缀（`feat` / `fix` / `chore` / `docs` / `refactor`，可带 scope），正文用简体中文，分小节说明改动与动机。
+- **AI 提交时必须添加 co-authored-by 尾注**：由 AI 生成并执行的提交，commit message 末尾需附 `Co-Authored-By: Reasonix <noreply@reasonix.ai>`，以标注该提交由 AI 协作完成。
