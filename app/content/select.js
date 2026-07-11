@@ -54,23 +54,26 @@ const createSelection = () => {
     highlight(element);
   };
 
-  const onMouseDown = (e) => {
+  const onPointerDown = (e) => {
+    // 仅处理鼠标指针，忽略触摸、触控笔等其他指针类型
+    if (e.pointerType !== "mouse") return;
     if (!target) return;
-    if (e.button !== 0) return; // 仅响应左键
+    if (e.button !== 0) return;
+    // 打印选中的元素信息，方便调试
+    console.log("[element-shot] pointerdown 选中元素:", target);
+    console.log("[element-shot] pointerdown 元素标签:", target.tagName, "类名:", target.className, "ID:", target.id);
     e.preventDefault();
     e.stopImmediatePropagation();
-    // 锁定 target，防止后续 mouseover / wheel 事件（如 debugger 横幅
-    // 导致的布局偏移触发意外 mouseover）覆盖掉用户按下的元素。
+    // 锁定 target，防止后续事件覆盖掉用户按下的元素。
     locked = true;
-    // mousedown 时即启动 chrome.debugger，让"正在调试此浏览器"横幅
-    // 在用户按住期间渲染完毕，避免抬起后再等待导致明显延迟。
-    // 注意：此处不移除高亮 overlay，让用户在按住期间仍能看到选中元素
-    // 的高亮效果，直到 mouseup 才移除并截图。
+    // 启动 chrome.debugger，让横幅在用户按住期间就渲染完毕。
     armed = true;
     chrome.runtime.sendMessage({ action: "attach" });
   };
 
-  const onMouseUp = (e) => {
+  const onPointerUp = (e) => {
+    // 仅处理鼠标指针
+    if (e.pointerType !== "mouse") return;
     if (!armed) return;
     if (e.button !== 0) return;
     e.preventDefault();
@@ -80,6 +83,20 @@ const createSelection = () => {
     removeOverlay();
     // debugger 横幅此时已渲染完成，直接触发截图。
     chrome.runtime.sendMessage({ action: "shot" });
+  };
+
+  // pointercancel：当指针交互被系统取消（如浏览器判定为滚屏/缩放手势）时的兜底清理。
+  // 若已经 arm 过（即已 attach debugger），需要通知 background 取消并 detach，
+  // 避免"正在调试此浏览器"横幅一直残留；若尚未 arm，则直接 teardown 选择层。
+  const onPointerCancel = (e) => {
+    if (e.pointerType !== "mouse") return;
+    if (armed) {
+      armed = false;
+      locked = false;
+      chrome.runtime.sendMessage({ action: "cancel" });
+    } else {
+      teardown();
+    }
   };
 
   // click 事件在 mouseup 之后触发，此处仅吞掉残余事件、阻止冒泡到页面元素，
@@ -146,8 +163,10 @@ const createSelection = () => {
 
   const teardown = () => {
     document.removeEventListener("mouseover", onMouseOver);
-    document.removeEventListener("mousedown", onMouseDown, true);
-    document.removeEventListener("mouseup", onMouseUp, true);
+    // 移除 Pointer Events 监听器
+    document.removeEventListener("pointerdown", onPointerDown, true);
+    document.removeEventListener("pointerup", onPointerUp, true);
+    document.removeEventListener("pointercancel", onPointerCancel);
     document.removeEventListener("click", onClick, true);
     document.removeEventListener("keydown", onKeyDown);
     document.removeEventListener("wheel", onWheel);
@@ -161,8 +180,11 @@ const createSelection = () => {
 
   const setup = () => {
     document.addEventListener("mouseover", onMouseOver);
-    document.addEventListener("mousedown", onMouseDown, true);
-    document.addEventListener("mouseup", onMouseUp, true);
+    // 注册 Pointer Events，在捕获阶段拦截，确保优先于页面的 pointerdown 监听器。
+    // pointerdown 比 mousedown 更早触发，能抢到更多主动权。
+    document.addEventListener("pointerdown", onPointerDown, true);
+    document.addEventListener("pointerup", onPointerUp, true);
+    document.addEventListener("pointercancel", onPointerCancel);
     document.addEventListener("click", onClick, true);
     document.addEventListener("keydown", onKeyDown);
     document.addEventListener("wheel", onWheel, { passive: false });
