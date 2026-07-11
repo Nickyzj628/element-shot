@@ -1,4 +1,3 @@
-import { existsSync } from "node:fs";
 import { defineConfig } from "addfox";
 
 const manifest = {
@@ -29,11 +28,6 @@ const manifest = {
   ],
 };
 
-const browserPath = process.env.LOCALAPPDATA
-  ? { chrome: `${process.env.LOCALAPPDATA}\\CentBrowser\\Application\\chrome.exe` }
-  : undefined;
-
 export default defineConfig({
   manifest: { chromium: manifest, firefox: { ...manifest } },
-  ...(browserPath && existsSync(browserPath.chrome) && { browserPath }),
 });

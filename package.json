@@ -4,7 +4,6 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "addfox dev",
     "build": "addfox build --no-open",
     "lint": "biome check .",
     "format": "biome check --write .",

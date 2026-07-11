@@ -1,6 +1,6 @@
-# CLAUDE.md
+# AGENTS.md
 
-本文件为 Claude Code (claude.ai/code) 提供本项目代码的上下文指导。
+本文件为 LLM 提供项目代码的上下文指导。
 
 > **AI 快速入门**：`.addfox/llms.txt` 包含由 Addfox 框架生成的项目全局概述，可帮助 AI 快速建立对项目的整体认知。
 >
@@ -20,20 +20,17 @@
 ## 常用开发命令
 
 ```bash
-# 启动开发服务器（带热重载）
-pnpm dev
-
-# 构建生产版本
+# 构建扩展
 pnpm build
 ```
 
 开发调试方式：
 
-1. 运行 `pnpm dev` 启动 Addfox 开发服务器
+1. 运行 `pnpm build` 构建扩展
 2. 在 Chrome 中打开 `chrome://extensions/`
 3. 开启"开发者模式"
 4. 加载 `.addfox/extension/extension-chromium/` 目录作为已解压的扩展程序
-5. 修改代码后，Addfox 会自动热重载
+5. 修改代码后再次运行 `pnpm build`，并在扩展管理页点击重新加载
 
 ## 项目结构
 
@@ -88,7 +85,6 @@ app/
 - **`appDir`** - 源码目录（默认：`"app"`）
 - **`outDir`** - 构建输出目录（默认：`"dist"`）
 - **`entry`** - 手动指定入口映射
-- **`hotReload`** - 开发服务器热重载设置
 - **`debug`** - 启用调试日志
 - **`zip`** - 输出 zip 配置
 - **`rsbuild`** - 覆盖 Rsbuild 配置
@@ -121,13 +117,3 @@ pnpm typecheck       # tsc --noEmit
 ```
 
 源码保持纯 JavaScript，通过 JSDoc + `checkJs` 提供类型提示，无需 .ts 重构。
-
-## Git 提交约定
-
-- 提交信息使用 Conventional Commits 前缀（`feat` / `fix` / `chore` / `docs` / `refactor`，可带 scope），正文用简体中文，分小节说明改动与动机。
-- **AI 提交时必须添加 co-authored-by 尾注**：由 AI 生成并执行的提交，commit message 末尾需附 `Co-Authored-By: Reasonix <noreply@reasonix.ai>`，以标注该提交由 AI 协作完成。
-
-## Git 提交约定
-
-- 提交信息使用 Conventional Commits 前缀（`feat` / `fix` / `chore` / `docs` / `refactor`，可带 scope），正文用简体中文，分小节说明改动与动机。
-- **AI 提交时必须添加 co-authored-by 尾注**：由 AI 生成并执行的提交，commit message 末尾需附 `Co-Authored-By: Reasonix <noreply@reasonix.ai>`，以标注该提交由 AI 协作完成。
