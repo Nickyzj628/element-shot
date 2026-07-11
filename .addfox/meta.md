@@ -22,7 +22,7 @@ related_files:
 - Framework: addfox
 - Name: Element Shot
 - Description: 仿Firefox内置截图功能
-- Version: 1.0.3
+- Version: 1.0.4
 - Framework version: 0.2.4
 - Manifest version: 3
 

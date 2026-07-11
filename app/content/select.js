@@ -61,11 +61,22 @@ const createSelection = () => {
     if (e.button !== 0) return;
     // 打印选中的元素信息，方便调试
     console.log("[element-shot] pointerdown 选中元素:", target);
-    console.log("[element-shot] pointerdown 元素标签:", target.tagName, "类名:", target.className, "ID:", target.id);
+    console.log(
+      "[element-shot] pointerdown 元素标签:",
+      target.tagName,
+      "类名:",
+      target.className,
+      "ID:",
+      target.id,
+    );
     e.preventDefault();
     e.stopImmediatePropagation();
     // 锁定 target，防止后续事件覆盖掉用户按下的元素。
     locked = true;
+    // 祖先 frame 可能仍高亮整个 iframe，先清理其遮罩，避免截图包含高亮层。
+    if (window.parent !== window) {
+      window.parent.postMessage({ action: "element-shot:clear-frame-selection" }, "*");
+    }
     // 启动 chrome.debugger，让横幅在用户按住期间就渲染完毕。
     armed = true;
     chrome.runtime.sendMessage({ action: "attach" });
@@ -110,8 +121,9 @@ const createSelection = () => {
     if (!target) return null;
     const rect = target.getBoundingClientRect();
     return {
-      x: rect.left + window.scrollX,
-      y: rect.top + window.scrollY,
+      // 坐标相对于当前 frame 的视口；由上层 frame 逐级换算到顶层页面坐标。
+      x: rect.left,
+      y: rect.top,
       width: rect.width,
       height: rect.height,
     };

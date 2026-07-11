@@ -4,6 +4,74 @@ import { createSelection } from "./select.js";
 let toastEl = null;
 let toastTimer = null;
 let origScrollbarGutter = "";
+const frameRectMessage = "element-shot:resolve-frame-rect";
+const clearFrameSelectionMessage = "element-shot:clear-frame-selection";
+
+const afterLayout = (callback) => {
+  requestAnimationFrame(() => {
+    requestAnimationFrame(callback);
+  });
+};
+
+const stabilizeScrollbar = () => {
+  origScrollbarGutter = document.documentElement.style.scrollbarGutter;
+  document.documentElement.style.scrollbarGutter = "stable";
+};
+
+const resolveDocumentRect = async (rect) => {
+  if (window.parent === window) {
+    return {
+      x: rect.x + window.scrollX,
+      y: rect.y + window.scrollY,
+      width: rect.width,
+      height: rect.height,
+    };
+  }
+
+  const channel = new MessageChannel();
+  const response = new Promise((resolve) => {
+    channel.port1.onmessage = (event) => resolve(event.data);
+  });
+  window.parent.postMessage({ action: frameRectMessage, rect }, "*", [channel.port2]);
+  return response;
+};
+
+window.addEventListener("message", (event) => {
+  /** @type {HTMLIFrameElement | HTMLFrameElement | null} */
+  let frame = null;
+  for (const element of document.querySelectorAll("iframe, frame")) {
+    if (
+      (element instanceof HTMLIFrameElement || element instanceof HTMLFrameElement) &&
+      element.contentWindow === event.source
+    ) {
+      frame = element;
+      break;
+    }
+  }
+  if (!frame) return;
+
+  if (event.data?.action === clearFrameSelectionMessage) {
+    selection.teardown();
+    if (window.parent !== window) {
+      window.parent.postMessage({ action: clearFrameSelectionMessage }, "*");
+    }
+    return;
+  }
+
+  if (event.data?.action !== frameRectMessage || !event.ports[0]) return;
+
+  const frameRect = frame.getBoundingClientRect();
+  const scaleX = frame.offsetWidth ? frameRect.width / frame.offsetWidth : 1;
+  const scaleY = frame.offsetHeight ? frameRect.height / frame.offsetHeight : 1;
+  const rect = event.data.rect;
+
+  void resolveDocumentRect({
+    x: frameRect.left + frame.clientLeft * scaleX + rect.x * scaleX,
+    y: frameRect.top + frame.clientTop * scaleY + rect.y * scaleY,
+    width: rect.width * scaleX,
+    height: rect.height * scaleY,
+  }).then((documentRect) => event.ports[0].postMessage(documentRect));
+});
 
 const showToast = (message, type) => {
   if (!toastEl) {
@@ -32,6 +100,10 @@ const showToast = (message, type) => {
 
 const selection = createSelection();
 
+window.addEventListener("element-shot-select", () => {
+  selection.setup();
+});
+
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   const { action, data } = message;
 
@@ -46,21 +118,24 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       showToast(data, "error");
       break;
     case "getRect": {
-      // 注入 scrollbar-gutter: stable，强制浏览器始终为滚动条保留空间。
-      // 这样 Page.captureScreenshot 隐藏滚动条时，页面内容不会膨胀移位，
-      // getBoundingClientRect 测量到的 x 坐标与截图时的实际布局一致。
-      origScrollbarGutter = document.documentElement.style.scrollbarGutter;
-      document.documentElement.style.scrollbarGutter = "stable";
-      // 双 rAF：确保 scrollbar-gutter 生效 + debugger 横幅渲染等异步布局变更完成。
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          const rect = selection.getRect();
-          sendResponse(rect);
+      afterLayout(() => {
+        const rect = selection.getRect();
+        if (!rect) {
+          sendResponse(null);
+          return;
+        }
+        void resolveDocumentRect(rect).then((documentRect) => {
+          sendResponse(documentRect);
           selection.teardown();
         });
       });
       return true; // 保持消息通道开启以支持异步 sendResponse
     }
+    case "prepareCapture":
+      // 截图 API 隐藏滚动条时不让顶层页面内容横向移位。
+      stabilizeScrollbar();
+      afterLayout(() => sendResponse());
+      return true;
     case "teardown":
       // background 在截图完成后发送此消息，此时恢复 scrollbar-gutter。
       document.documentElement.style.scrollbarGutter = origScrollbarGutter;

@@ -3,7 +3,7 @@ import { defineConfig } from "addfox";
 
 const manifest = {
   name: "Element Shot",
-  version: "1.0.3",
+  version: "1.0.4",
   manifest_version: 3,
   description: "仿Firefox内置截图功能",
   permissions: ["activeTab", "scripting", "clipboardWrite", "debugger"],
@@ -23,6 +23,8 @@ const manifest = {
   content_scripts: [
     {
       matches: ["<all_urls>"],
+      all_frames: true,
+      match_about_blank: true,
     },
   ],
 };

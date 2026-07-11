@@ -1,24 +1,28 @@
 // 记录已 attach debugger 的标签页，防止重复 attach。
-const armedTabs = new Set();
+const armedTabs = new Map();
 // 记录正在截图的标签页，防止并发请求叠加。
 const capturingTabs = new Set();
 
 chrome.action.onClicked.addListener((tab) => {
   if (tab.id == null) return;
-  chrome.tabs.sendMessage(tab.id, { action: "select" }, () => {
-    void chrome.runtime.lastError;
-  });
+  void chrome.scripting
+    .executeScript({
+      target: { tabId: tab.id, allFrames: true },
+      func: () => window.dispatchEvent(new Event("element-shot-select")),
+    })
+    .catch(() => {});
 });
 
 chrome.runtime.onMessage.addListener((message, sender) => {
   const { action } = message;
   const tabId = sender.tab?.id;
+  const frameId = sender.frameId;
   if (tabId == null) return;
 
   // mousedown：提前 attach debugger，让"正在调试此浏览器"横幅在用户按住期间渲染好。
   if (action === "attach") {
     if (armedTabs.has(tabId) || capturingTabs.has(tabId)) return;
-    armedTabs.add(tabId);
+    armedTabs.set(tabId, frameId);
     armDebugger(tabId);
     return;
   }
@@ -27,23 +31,25 @@ chrome.runtime.onMessage.addListener((message, sender) => {
   if (action === "shot") {
     if (capturingTabs.has(tabId)) return;
     capturingTabs.add(tabId);
+    const armedFrameId = armedTabs.get(tabId);
     const wasArmed = armedTabs.delete(tabId);
-    capture(tabId, wasArmed);
+    capture(tabId, wasArmed, armedFrameId ?? frameId);
     return;
   }
 
   // Esc 取消（mousedown 之后、mouseup 之前）：detach debugger 并清理。
   if (action === "cancel") {
+    const armedFrameId = armedTabs.get(tabId);
     if (!armedTabs.delete(tabId)) return;
-    sendMessage(tabId, "teardown");
+    sendMessage(tabId, "teardown", undefined, armedFrameId);
     chrome.debugger.detach({ tabId }, () => {
       void chrome.runtime.lastError;
     });
   }
 });
 
-const sendMessage = (tabId, action, data) => {
-  chrome.tabs.sendMessage(tabId, { action, data }, () => {
+const sendMessage = (tabId, action, data, frameId) => {
+  chrome.tabs.sendMessage(tabId, { action, data }, { frameId }, () => {
     void chrome.runtime.lastError;
   });
 };
@@ -75,7 +81,7 @@ const writeBase64ToClipboard = async (base64Data) => {
   }
 };
 
-const capture = async (tabId, wasArmed) => {
+const capture = async (tabId, wasArmed, frameId) => {
   try {
     if (!wasArmed) {
       // 未提前 attach（兼容旧路径），现在补上。
@@ -85,8 +91,9 @@ const capture = async (tabId, wasArmed) => {
       await new Promise((r) => setTimeout(r, 150));
     }
 
-    // 向 content script 请求横幅出现后的元素坐标
-    const rectData = await chrome.tabs.sendMessage(tabId, { action: "getRect" });
+    // 顶层 frame 保留滚动条空间；目标 frame 返回换算后的顶层页面坐标。
+    await chrome.tabs.sendMessage(tabId, { action: "prepareCapture" }, { frameId: 0 });
+    const rectData = await chrome.tabs.sendMessage(tabId, { action: "getRect" }, { frameId });
     if (!rectData) {
       sendMessage(tabId, "error", "截图取消或目标元素已失效");
       return;
@@ -120,7 +127,8 @@ const capture = async (tabId, wasArmed) => {
   } finally {
     capturingTabs.delete(tabId);
     // 通知 content script 清理选择状态（无论成功或失败）
-    sendMessage(tabId, "teardown");
+    sendMessage(tabId, "teardown", undefined, frameId);
+    sendMessage(tabId, "teardown", undefined, 0);
     try {
       await chrome.debugger.detach({ tabId });
     } catch (_e) {
