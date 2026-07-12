@@ -22,14 +22,13 @@ related_files:
 - Framework: addfox
 - Name: Element Shot
 - Description: 仿Firefox内置截图功能
-- Version: 1.0.4
+- Version: 1.0.5
 - Framework version: 0.2.4
 - Manifest version: 3
 
 ## 2. Permissions
 
 ### 2.1 Permissions
-- activeTab
 - scripting
 - clipboardWrite
 - debugger
@@ -54,6 +53,6 @@ content/
 ├── 📁 JS/
 │   └── content/index.js
 └── 📁 CSS/
-    └── static/css/content.bd20ebe820.css
+    └── static/css/content.7dbadaca47.css
     ⚙️  html: false
 ```

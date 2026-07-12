@@ -6,6 +6,15 @@
   box-sizing: border-box;
 }
 
+.element-shot-overlay-hidden {
+  background-color: transparent;
+}
+
+.element-shot-overlay-shield {
+  /* 透明遮罩仍参与命中测试，防止目标元素因鼠标 hover 恢复原生控件。 */
+  pointer-events: auto;
+}
+
 .element-shot-toast {
   position: fixed;
   top: 16px;

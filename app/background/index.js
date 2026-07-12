@@ -4,11 +4,12 @@
 
 /** @type {Map<number, ArmedTab>} */
 const armedTabs = new Map();
-// 记录正在截图的标签页，防止并发请求叠加。
+// armedTabs 覆盖 attach 到 shot；capturingTabs 只覆盖实际截图阶段，二者均阻止同 tab 重入。
 const capturingTabs = new Set();
 
 chrome.action.onClicked.addListener((tab) => {
   if (tab.id == null) return;
+  // 在所有 frame 派发事件，比只给某个 frame 发 runtime 消息更适合 all_frames 选择器。
   void chrome.scripting
     .executeScript({
       target: { tabId: tab.id, allFrames: true },
@@ -23,7 +24,7 @@ chrome.runtime.onMessage.addListener((message, sender) => {
   const frameId = sender.frameId ?? 0;
   if (tabId == null) return;
 
-  // mousedown：提前 attach debugger，让"正在调试此浏览器"横幅在用户按住期间渲染好。
+  // pointerdown：提前 attach debugger，让调试横幅在用户按住期间渲染好。
   if (action === "attach") {
     if (armedTabs.has(tabId) || capturingTabs.has(tabId)) return;
     /** @type {ArmedTab} */
@@ -33,17 +34,17 @@ chrome.runtime.onMessage.addListener((message, sender) => {
     return;
   }
 
-  // mouseup：横幅已就位，直接截图。
+  // pointerup：只接受已由 pointerdown 建立的会话，避免绕过布局稳定阶段。
   if (action === "shot") {
-    if (capturingTabs.has(tabId)) return;
-    capturingTabs.add(tabId);
     const armedTab = armedTabs.get(tabId);
+    if (!armedTab || capturingTabs.has(tabId)) return;
     armedTabs.delete(tabId);
-    capture(tabId, armedTab, frameId);
+    capturingTabs.add(tabId);
+    capture(tabId, armedTab);
     return;
   }
 
-  // Esc 取消（mousedown 之后、mouseup 之前）：detach debugger 并清理。
+  // Esc 或 pointercancel 取消：detach debugger 并清理。
   if (action === "cancel") {
     const armedTab = armedTabs.get(tabId);
     armedTabs.delete(tabId);
@@ -56,6 +57,7 @@ chrome.runtime.onMessage.addListener((message, sender) => {
 });
 
 const sendMessage = (tabId, action, data, frameId) => {
+  // 忽略目标 frame 已销毁等发送错误；截图 finally 仍需继续清理 debugger。
   chrome.tabs.sendMessage(tabId, { action, data }, { frameId }, () => {
     void chrome.runtime.lastError;
   });
@@ -67,19 +69,21 @@ const detachDebugger = async (tabId, armedTab) => {
   try {
     await chrome.debugger.detach({ tabId });
   } catch (_e) {
-    // 已由浏览器释放调试会话时无需处理。
+    // 已由浏览器释放调试会话时无需处理，清理流程仍然可以结束。
   }
 };
 
 const armDebugger = async (tabId, armedTab) => {
+  let failed = false;
   try {
     await chrome.debugger.attach({ tabId }, "1.3");
     armedTab.attached = true;
     await chrome.debugger.sendCommand({ tabId }, "Page.enable");
-    // 等待横幅渲染、页面重新布局，随后即处于就绪状态，等待 mouseup 触发截图。
+    // 等待调试横幅和页面布局稳定，随后允许 pointerup 触发截图。
     await new Promise((r) => setTimeout(r, 150));
     return !armedTab.cancelled;
   } catch (err) {
+    failed = true;
     const msg = err instanceof Error ? err.message : String(err);
     console.error("[background] arm error:", msg);
     if (!armedTab.cancelled) {
@@ -89,7 +93,7 @@ const armDebugger = async (tabId, armedTab) => {
     }
     return false;
   } finally {
-    if (armedTab.cancelled) {
+    if (armedTab.cancelled || failed) {
       await detachDebugger(tabId, armedTab);
     }
   }
@@ -110,30 +114,19 @@ const writeBase64ToClipboard = async (base64Data) => {
 
 /**
  * @param {number} tabId
- * @param {ArmedTab | undefined} armedTab
- * @param {number} fallbackFrameId
+ * @param {ArmedTab} armedTab
  */
-const capture = async (tabId, armedTab, fallbackFrameId) => {
-  const frameId = armedTab?.frameId ?? fallbackFrameId;
+const capture = async (tabId, armedTab) => {
+  const { frameId } = armedTab;
   try {
-    if (armedTab) {
-      const ready = await armedTab.ready;
-      if (!ready) return;
-    } else {
-      // 未提前 attach（兼容旧路径），现在补上。
-      armedTab = { frameId, attached: false, cancelled: false, ready: null };
-      await chrome.debugger.attach({ tabId }, "1.3");
-      armedTab.attached = true;
-      await chrome.debugger.sendCommand({ tabId }, "Page.enable");
-      // 等待一帧让 debugger 横幅渲染、页面完成重新布局
-      await new Promise((r) => setTimeout(r, 150));
-    }
+    const ready = await armedTab.ready;
+    if (!ready) return;
 
-    // 顶层 frame 保留滚动条空间；目标 frame 返回换算后的顶层页面坐标。
+    // 顶层 frame 固定滚动条布局；目标 frame 再返回换算后的顶层页面坐标。
     await chrome.tabs.sendMessage(tabId, { action: "prepareCapture" }, { frameId: 0 });
     const rectData = await chrome.tabs.sendMessage(tabId, { action: "getRect" }, { frameId });
     if (!rectData) {
-      sendMessage(tabId, "error", "截图取消或目标元素已失效");
+      sendMessage(tabId, "error", "截图取消或目标元素已失效", frameId);
       return;
     }
 
@@ -158,19 +151,21 @@ const capture = async (tabId, armedTab, fallbackFrameId) => {
 
     const res = injectionResult?.result;
     if (res?.ok) {
-      sendMessage(tabId, "success", res.message);
+      sendMessage(tabId, "success", res.message, frameId);
     } else {
-      sendMessage(tabId, "error", res?.message || "未知错误");
+      sendMessage(tabId, "error", res?.message || "未知错误", frameId);
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error("[background] capture error:", msg);
-    sendMessage(tabId, "error", `截图失败：${msg}`);
+    sendMessage(tabId, "error", `截图失败：${msg}`, frameId);
   } finally {
     capturingTabs.delete(tabId);
     // 通知 content script 清理选择状态（无论成功或失败）
     sendMessage(tabId, "teardown", undefined, frameId);
-    sendMessage(tabId, "teardown", undefined, 0);
+    if (frameId !== 0) {
+      sendMessage(tabId, "teardown", undefined, 0);
+    }
     await detachDebugger(tabId, armedTab);
   }
 };

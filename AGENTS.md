@@ -1,119 +1,48 @@
 # AGENTS.md
 
-本文件为 LLM 提供项目代码的上下文指导。
+> 多写注释：本项目的核心难点是浏览器扩展的多上下文通信、Pointer Events 和 iframe 坐标换算。修改这些逻辑时，请用简短注释说明原因、发送方/接收方和清理时机。
 
-> **AI 快速入门**：`.addfox/llms.txt` 包含由 Addfox 框架生成的项目全局概述，可帮助 AI 快速建立对项目的整体认知。
->
-> **Addfox Skills**：`.agents/skills/` 目录下存放了 Addfox 框架的 skills 指导文件（如 `addfox-best-practices`、`addfox-debugging`、`migrate-to-addfox` 等），优先参考这些文件，然后再参考本指南。
+## 项目定位
 
-## 项目概述
+- 这是一个使用原生 JavaScript、Addfox 和 Manifest V3 构建的元素截图扩展；源码入口只有 `app/background/index.js`（Service Worker）和 `app/content/index.js`（页面 content script）。
+- `app/content/select.js` 是选择状态机，`styles.css` 只负责高亮遮罩和结果 toast；不要把截图协议逻辑塞进样式或选择器之外的随机文件。
+- `.addfox/` 是 Addfox 生成的元数据、缓存和构建产物目录；`.addfox/llms.txt` 标明为自动生成，不能手工维护。源码改动后以 `app/` 和 `addfox.config.js` 为准。
 
-这是一个 Chrome 浏览器扩展（Manifest V3），功能为"元素截图"。点击扩展图标后，用户可以在页面上悬停高亮元素，点击左键即可将该元素的截图保存到剪贴板。
-
-## 技术栈
-
-- 原生 JavaScript（无前端框架）
-- [Addfox](https://addfox.dev) 浏览器扩展构建工具（基于 Rsbuild）
-- Chrome Extension Manifest V3
-- pnpm 包管理器
-
-## 常用开发命令
+## 命令与调试
 
 ```bash
-# 构建扩展
-pnpm build
+pnpm build        # 生成可加载的扩展；脚本已包含 --no-open
+pnpm lint         # Biome lint + 格式检查
+pnpm format:check # 只检查格式
+pnpm format       # Biome 自动格式化
+pnpm typecheck    # TypeScript checkJs，仅检查 app/**/*.js，不输出文件
 ```
 
-开发调试方式：
+- 本仓库没有测试脚本；最小验证顺序是 `pnpm lint`、`pnpm typecheck`、`pnpm build`。
+- `pnpm build` 后在 Chrome `chrome://extensions/` 开发者模式加载 `.addfox/extension/extension-chromium/`，源码更新后重新 build 并点击扩展的“重新加载”。
+- 运行时问题要同时检查页面 DevTools（content script）和扩展的 Service Worker 检查器（background）；截图失败通常发生在两者之间的消息或 debugger 生命周期上。
+- `biome.json` 强制 2 空格、双引号、分号、尾逗号、100 列和 CRLF；不要手工引入另一套格式。
 
-1. 运行 `pnpm build` 构建扩展
-2. 在 Chrome 中打开 `chrome://extensions/`
-3. 开启"开发者模式"
-4. 加载 `.addfox/extension/extension-chromium/` 目录作为已解压的扩展程序
-5. 修改代码后再次运行 `pnpm build`，并在扩展管理页点击重新加载
+## 真实业务流程
 
-## 项目结构
+1. 点击扩展图标后，background 用 `chrome.scripting.executeScript` 在所有 frame 派发 `element-shot-select`；content 监听它并调用 `selection.setup()`。
+2. 选择模式只在 setup 后挂载 document 级监听。`mouseover` 高亮目标；向上滚轮选择祖先，向下滚轮回到原始 hover 元素。`pointerdown` 仅接受鼠标左键，锁定目标、捕获后续 pointerup 到遮罩，并发送 `attach`。
+3. background 为每个 tab 用 `armedTabs` 保存 `frameId`、debugger 是否已连接、取消状态和 ready Promise；`capturingTabs` 防止同一 tab 并发截图。`attach` 会 `debugger.attach`、`Page.enable` 并等待 150ms，让调试横幅和页面重排完成。
+4. `pointerup` 移除遮罩并发送 `shot`。background 等待 ready 后先向顶层 frame 发 `prepareCapture` 固定滚动条槽，再向选中 frame 发 `getRect`。目标 frame 的 content script 通过 `postMessage` 逐级把 iframe 内视口坐标换算为顶层文档坐标。
+5. background 调用 `Page.captureScreenshot`，使用 PNG、`captureBeyondViewport: true`、`fromSurface: true` 截取目标区域；然后通过 `scripting.executeScript` 把页面函数 `writeBase64ToClipboard` 注入目标页，因为 MV3 Service Worker 不能直接使用页面剪贴板 API。
+6. 成功或失败都向选中 frame 发送结果 toast 和 `teardown`；当目标在 iframe 时另向顶层 frame 发送 `teardown`，恢复 `scrollbarGutter`。完成后在 finally 中清理 `capturingTabs` 并 detach debugger。取消路径为 `Escape` 或 `pointercancel`，发送 `cancel` 后同样必须 detach。
 
-Addfox 采用约定式入口结构，源码位于 `app/` 目录，子目录自动识别为扩展入口：
+## 关键约束
 
-```
-app/
-  background/    # Service Worker（后台脚本）
-    index.js
-  content/       # 内容脚本
-    index.js
-    styles.css
-```
+- manifest 在 `addfox.config.js` 中同时声明 Chromium 和 Firefox 变体；权限 `debugger`、`scripting`、`clipboardWrite` 和 `<all_urls>` content script 是当前功能所需，不要只改生成的 manifest。
+- content script 配置为 `all_frames: true`、`match_about_blank: true`。消息必须带正确 `frameId`；截图结束时既通知目标 frame，也通知顶层 frame，避免 iframe 或顶层残留选择层。
+- 目标矩形必须在 debugger 横幅出现后重新测量；不要缓存 `mouseover` 时的 rect。页面滚动坐标在顶层 `resolveDocumentRect` 中加入，iframe 还要考虑 `clientLeft/clientTop` 和 frame 缩放比例。
+- `select.js` 里的 `stopImmediatePropagation`、捕获阶段监听和 overlay 的 `setPointerCapture` 是为了拦截页面自身事件（尤其视频控件），改动时要验证 pointerup、click、Esc、pointercancel 四条清理路径。
+- 不要把 `navigator.clipboard.write` 移回 background；剪贴板写入必须发生在页面注入函数中，且函数返回 `{ ok, message }` 供 background 显示 toast。
+- 源码使用 JSDoc 配合 `tsconfig.json` 的 `checkJs`；新增跨 API 数据结构时优先补 typedef/JSDoc，不要把项目改成 TypeScript 或直接编辑 `.addfox/extension/`。
 
-当前扩展只包含 background 和 content 两个入口。每个入口子目录需要以 `index.js` 作为入口文件，Addfox 会自动将其注入到 manifest 中。
+## 变更检查
 
-`public/` 目录下的静态资源会被复制到构建输出目录。
-
-## 架构说明
-
-> 以下架构说明为当前 Addfox 框架项目的实际实现，源码位于 `app/` 目录下。
-
-### 通信流程
-
-整个截图流程涉及多次跨上下文通信，阅读代码时需注意消息发送者和接收者：
-
-1. **background → content**：用户点击扩展图标时，`chrome.action.onClicked` 触发，向当前标签页发送 `{ action: "select" }`，启动元素选择模式。
-2. **content → background（`attach`）**：用户在目标元素上**按下**鼠标左键（`mousedown`）时，content script 锁定选中元素并发送 `{ action: "attach" }`。background 随即 `chrome.debugger.attach` + `Page.enable`，让"正在调试此浏览器"黄色横幅在用户按住期间渲染完毕、页面完成重新布局。
-3. **content → background（`shot`）**：用户**抬起**鼠标左键（`mouseup`）时，content script 发送 `{ action: "shot" }`。background 通过 `chrome.tabs.sendMessage` 向 content 请求 `{ action: "getRect" }`，content 在横幅出现后重新测量 `getBoundingClientRect()`（坐标加上 `window.scrollX/scrollY` 以支持超出视口的元素）并返回。background 据此调用 `Page.captureScreenshot`（启用 `captureBeyondViewport` 支持超视口区域）截取目标区域得到 base64 PNG，再通过 `chrome.scripting.executeScript` 向页面注入 `writeBase64ToClipboard` 执行剪贴板写入，并根据结果回送 `{ action: "success" }` 或 `{ action: "error" }`。处理完成后无论成败都会 `chrome.debugger.detach` 释放调试会话。
-4. **content → background（`cancel`，可选）**：若用户在按下后、抬起前按 `Esc`，content 发送 `{ action: "cancel" }`，background 直接 `detach` 并通知 content 清理选择状态，不进行截图。
-
-### 关键实现细节
-
-- **使用 chrome.debugger 截图**：选择 `chrome.debugger` API 而非 `chrome.tabs.captureVisibleTab`，是因为后者只能截取当前视口，无法支持超出视口范围的元素。`debugger` 每次使用会弹出"正在调试此浏览器"黄色横幅，是当前方案的已知代价。
-- **按下即 attach、抬起才截图**：将 `chrome.debugger.attach` 提前到 `mousedown`，使横幅在用户按住期间就渲染并完成布局，`mouseup` 时无需再等待即可截图，消除抬起后到截图之间的明显延迟。background 用 `armedTabs: Set<tabId>` 记录已 attach 但尚未截图的标签页，`capturingTabs: Set<tabId>` 记录正在截图的标签页，二者共同防止并发请求叠加。
-- **元素选择交互**：content 脚本通过 `mouseover` 实时高亮、`mousedown` 启动 debugger、`mouseup` 触发截图、`wheel` 在祖先层级之间切换（向上滚=父元素、向下滚=回到子一级）、`Esc` 退出选择模式（按下阶段则取消截图）。
-- **剪贴板写入方式**：由于 Manifest V3 的 Service Worker 无法直接访问 `navigator.clipboard.write`，background.js 将 base64 数据传入页面上下文，在页面中执行 `ClipboardItem` 写入操作。
-- **错误/成功提示**：content.js 收到 `success` / `error` 消息后会在页面顶部显示 toast 浮层提示，3 秒后自动消失。
-
-## Addfox 配置
-
-### 关键配置字段（`addfox.config.js`）
-
-#### 必填字段
-
-- **`manifest`** - 扩展的 manifest.json 内容
-  - 支持 `chromium` 和 `firefox` 双版本变体
-  - Addfox 会自动注入入口路径，无需手动填写
-
-#### 可选字段（按需使用）
-
-- **`appDir`** - 源码目录（默认：`"app"`）
-- **`outDir`** - 构建输出目录（默认：`"dist"`）
-- **`entry`** - 手动指定入口映射
-- **`debug`** - 启用调试日志
-- **`zip`** - 输出 zip 配置
-- **`rsbuild`** - 覆盖 Rsbuild 配置
-- **`plugins`** - 添加 Rsbuild 插件
-
-### 浏览器扩展 API
-
-- 可直接使用 `chrome.*` API
-- 如需跨浏览器兼容，可安装 `webextension-polyfill`
-
-### 样式
-
-- 纯 CSS，无需预处理器
-- 内容脚本样式：如需隔离，可结合 Shadow DOM 使用
-
-## 相关资源
-
-- [Addfox 官方文档](https://addfox.dev)
-- [WebExtension API 文档](https://developer.mozilla.org/zh-CN/docs/Mozilla/Add-ons/WebExtensions/API)
-
-## 代码质量
-
-项目使用 [Biome](https://biomejs.dev) 进行 lint 与格式化，使用 TypeScript（`checkJs` 模式，仅做类型检查不输出）。运行：
-
-```bash
-pnpm lint            # Biome lint
-pnpm format:check    # Biome 格式校验
-pnpm format          # Biome 自动修复
-pnpm typecheck       # tsc --noEmit
-```
-
-源码保持纯 JavaScript，通过 JSDoc + `checkJs` 提供类型提示，无需 .ts 重构。
+- 修改消息 action、frame 坐标或 debugger 状态时，检查对应发送方和接收方是否一起更新，并覆盖成功、异常、取消和重复触发。
+- 修改 manifest 权限、入口或构建配置时，执行 `pnpm build` 并检查生成 manifest；`.addfox/cache/` 和 `.addfox/extension/` 是忽略的生成目录，`.addfox/llms.txt` 和 `.addfox/meta.md` 是受跟踪的自动生成元数据，不要手工维护。
+- 修改页面注入代码时，确保函数仍可被 `chrome.scripting.executeScript({ func, args })` 序列化执行，不能依赖 background 模块作用域变量。

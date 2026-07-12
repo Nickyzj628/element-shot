@@ -6,7 +6,9 @@ let toastTimer = null;
 let origScrollbarGutter = "";
 const frameRectMessage = "element-shot:resolve-frame-rect";
 const clearFrameSelectionMessage = "element-shot:clear-frame-selection";
+const frameRectTimeoutMs = 5000;
 
+// debugger 横幅和滚动条布局都会引起重排，连续两帧后再测量才能拿到稳定 rect。
 const afterLayout = (callback) => {
   requestAnimationFrame(() => {
     requestAnimationFrame(callback);
@@ -28,9 +30,18 @@ const resolveDocumentRect = async (rect) => {
     };
   }
 
+  // 每个 iframe 只负责加上自己的 frame 边界，再把结果交给父 frame 继续处理。
   const channel = new MessageChannel();
-  const response = new Promise((resolve) => {
-    channel.port1.onmessage = (event) => resolve(event.data);
+  const response = new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      channel.port1.close();
+      reject(new Error("iframe 坐标换算超时"));
+    }, frameRectTimeoutMs);
+    channel.port1.onmessage = (event) => {
+      clearTimeout(timeout);
+      channel.port1.close();
+      resolve(event.data);
+    };
   });
   window.parent.postMessage({ action: frameRectMessage, rect }, "*", [channel.port2]);
   return response;
@@ -60,6 +71,7 @@ window.addEventListener("message", (event) => {
 
   if (event.data?.action !== frameRectMessage || !event.ports[0]) return;
 
+  // postMessage 没有 frameId，只接受实际 contentWindow 对应的 iframe，避免串 frame。
   const frameRect = frame.getBoundingClientRect();
   const scaleX = frame.offsetWidth ? frameRect.width / frame.offsetWidth : 1;
   const scaleY = frame.offsetHeight ? frameRect.height / frame.offsetHeight : 1;
@@ -70,7 +82,9 @@ window.addEventListener("message", (event) => {
     y: frameRect.top + frame.clientTop * scaleY + rect.y * scaleY,
     width: rect.width * scaleX,
     height: rect.height * scaleY,
-  }).then((documentRect) => event.ports[0].postMessage(documentRect));
+  })
+    .then((documentRect) => event.ports[0].postMessage(documentRect))
+    .catch(() => event.ports[0].postMessage(null));
 });
 
 const showToast = (message, type) => {
@@ -108,9 +122,6 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   const { action, data } = message;
 
   switch (action) {
-    case "select":
-      selection.setup();
-      break;
     case "success":
       showToast(data, "success");
       break;
@@ -124,10 +135,10 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
           sendResponse(null);
           return;
         }
-        void resolveDocumentRect(rect).then((documentRect) => {
-          sendResponse(documentRect);
-          selection.teardown();
-        });
+        void resolveDocumentRect(rect)
+          .then((documentRect) => sendResponse(documentRect))
+          .catch(() => sendResponse(null))
+          .finally(() => selection.teardown());
       });
       return true; // 保持消息通道开启以支持异步 sendResponse
     }
