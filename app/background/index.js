@@ -56,6 +56,12 @@ chrome.runtime.onMessage.addListener((message, sender) => {
   }
 });
 
+/**
+ * @param {number} tabId
+ * @param {string} action
+ * @param {unknown} data
+ * @param {number} frameId
+ */
 const sendMessage = (tabId, action, data, frameId) => {
   // 忽略目标 frame 已销毁等发送错误；截图 finally 仍需继续清理 debugger。
   chrome.tabs.sendMessage(tabId, { action, data }, { frameId }, () => {
@@ -63,6 +69,10 @@ const sendMessage = (tabId, action, data, frameId) => {
   });
 };
 
+/**
+ * @param {number} tabId
+ * @param {ArmedTab} armedTab
+ */
 const detachDebugger = async (tabId, armedTab) => {
   if (!armedTab.attached) return;
   armedTab.attached = false;
@@ -73,6 +83,10 @@ const detachDebugger = async (tabId, armedTab) => {
   }
 };
 
+/**
+ * @param {number} tabId
+ * @param {ArmedTab} armedTab
+ */
 const armDebugger = async (tabId, armedTab) => {
   let failed = false;
   try {
@@ -99,6 +113,7 @@ const armDebugger = async (tabId, armedTab) => {
   }
 };
 
+/** @param {string} base64Data */
 const writeBase64ToClipboard = async (base64Data) => {
   try {
     const response = await fetch(`data:image/png;base64,${base64Data}`);

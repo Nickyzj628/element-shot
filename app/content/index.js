@@ -1,7 +1,11 @@
 import "./styles.css";
 import { createSelection } from "./select.js";
 
+/** @typedef {{ x: number, y: number, width: number, height: number }} FrameRect */
+
+/** @type {HTMLDivElement | null} */
 let toastEl = null;
+/** @type {ReturnType<typeof setTimeout> | null} */
 let toastTimer = null;
 let origScrollbarGutter = "";
 const frameRectMessage = "element-shot:resolve-frame-rect";
@@ -9,6 +13,7 @@ const clearFrameSelectionMessage = "element-shot:clear-frame-selection";
 const frameRectTimeoutMs = 5000;
 
 // debugger 横幅和滚动条布局都会引起重排，连续两帧后再测量才能拿到稳定 rect。
+/** @param {() => void} callback */
 const afterLayout = (callback) => {
   requestAnimationFrame(() => {
     requestAnimationFrame(callback);
@@ -20,6 +25,7 @@ const stabilizeScrollbar = () => {
   document.documentElement.style.scrollbarGutter = "stable";
 };
 
+/** @param {FrameRect} rect */
 const resolveDocumentRect = async (rect) => {
   if (window.parent === window) {
     return {
@@ -32,6 +38,7 @@ const resolveDocumentRect = async (rect) => {
 
   // 每个 iframe 只负责加上自己的 frame 边界，再把结果交给父 frame 继续处理。
   const channel = new MessageChannel();
+  /** @type {Promise<FrameRect>} */
   const response = new Promise((resolve, reject) => {
     const timeout = setTimeout(() => {
       channel.port1.close();
@@ -40,7 +47,7 @@ const resolveDocumentRect = async (rect) => {
     channel.port1.onmessage = (event) => {
       clearTimeout(timeout);
       channel.port1.close();
-      resolve(event.data);
+      resolve(/** @type {FrameRect} */ (event.data));
     };
   });
   window.parent.postMessage({ action: frameRectMessage, rect }, "*", [channel.port2]);
@@ -75,6 +82,7 @@ window.addEventListener("message", (event) => {
   const frameRect = frame.getBoundingClientRect();
   const scaleX = frame.offsetWidth ? frameRect.width / frame.offsetWidth : 1;
   const scaleY = frame.offsetHeight ? frameRect.height / frame.offsetHeight : 1;
+  /** @type {FrameRect} */
   const rect = event.data.rect;
 
   void resolveDocumentRect({
@@ -87,6 +95,10 @@ window.addEventListener("message", (event) => {
     .catch(() => event.ports[0].postMessage(null));
 });
 
+/**
+ * @param {string} message
+ * @param {"success" | "error"} type
+ */
 const showToast = (message, type) => {
   if (!toastEl) {
     toastEl = document.createElement("div");
@@ -97,8 +109,9 @@ const showToast = (message, type) => {
   toastEl.textContent = message;
   toastEl.className = `element-shot-toast ${type}`;
 
+  const currentToast = toastEl;
   requestAnimationFrame(() => {
-    toastEl.classList.add("show");
+    currentToast.classList.add("show");
   });
 
   if (toastTimer !== null) {

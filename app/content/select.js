@@ -4,14 +4,23 @@
 
 const createSelection = () => {
   // target 是最终截图对象，hoverOrigin 保留鼠标最初经过的元素，供滚轮层级切换使用。
+  /** @type {Element | null} */
   let target = null;
+  /** @type {Element | null} */
   let hoverOrigin = null;
   let depth = 0;
+  /** @type {HTMLDivElement | null} */
   let overlayEl = null;
   let locked = false;
   let armed = false;
 
+  /**
+   * @param {Element} element
+   * @param {number} levels
+   * @returns {Element | null}
+   */
   const getAncestor = (element, levels) => {
+    /** @type {Element | null} */
     let el = element;
     for (let i = 0; i < levels && el; i++) {
       el = el.parentElement;
@@ -40,6 +49,7 @@ const createSelection = () => {
     overlayEl?.classList.add("element-shot-overlay-hidden");
   };
 
+  /** @param {Element} element */
   const highlight = (element) => {
     target = element;
     const rect = element.getBoundingClientRect();
@@ -52,16 +62,19 @@ const createSelection = () => {
     overlay.style.height = `${rect.height}px`;
   };
 
+  /** @param {MouseEvent} e */
   const onMouseOver = (e) => {
     if (locked) return;
     e.stopPropagation();
     const element = e.target;
+    if (!(element instanceof Element)) return;
     if (element === target) return;
     hoverOrigin = element;
     depth = 0;
     highlight(element);
   };
 
+  /** @param {PointerEvent} e */
   const onPointerDown = (e) => {
     // 仅处理鼠标指针，忽略触摸、触控笔等其他指针类型
     if (e.pointerType !== "mouse") return;
@@ -84,6 +97,7 @@ const createSelection = () => {
     chrome.runtime.sendMessage({ action: "attach" });
   };
 
+  /** @param {PointerEvent} e */
   const onPointerUp = (e) => {
     // 仅处理鼠标指针
     if (e.pointerType !== "mouse") return;
@@ -101,6 +115,7 @@ const createSelection = () => {
   // pointercancel：当指针交互被系统取消（如浏览器判定为滚屏/缩放手势）时的兜底清理。
   // 若已经 arm 过（即已 attach debugger），需要通知 background 取消并 detach，
   // 避免"正在调试此浏览器"横幅一直残留；若尚未 arm，则直接 teardown 选择层。
+  /** @param {PointerEvent} e */
   const onPointerCancel = (e) => {
     if (e.pointerType !== "mouse") return;
     if (armed) {
@@ -114,6 +129,7 @@ const createSelection = () => {
 
   // click 事件在 pointerup 之后触发，此处仅吞掉残余事件、阻止冒泡到页面元素，
   // 不再启动截图（截图已在 pointerup 中触发）。
+  /** @param {MouseEvent} e */
   const onClick = (e) => {
     e.preventDefault();
     e.stopImmediatePropagation();
@@ -131,6 +147,7 @@ const createSelection = () => {
     };
   };
 
+  /** @param {KeyboardEvent} e */
   const onKeyDown = (e) => {
     if (e.key === "Escape") {
       e.preventDefault();
@@ -146,6 +163,7 @@ const createSelection = () => {
     }
   };
 
+  /** @param {WheelEvent} e */
   const onWheel = (e) => {
     if (locked) return;
     if (!hoverOrigin) return;
